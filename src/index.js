@@ -281,6 +281,7 @@ class CacheFactoryProvider {
             let value = item.value;
             let now = new Date().getTime();
 
+            // 每次访问时更新accessed属性
             if ($$storage) {
               $$lruHeap.remove({
                 key: key,
@@ -297,6 +298,7 @@ class CacheFactoryProvider {
               $$lruHeap.push(item);
             }
 
+            // deleteOnExpire是passive时，如果过期。立即删除
             if (this.$$deleteOnExpire === 'passive' && 'expires' in item && item.expires < now) {
               this.remove(key);
 
@@ -322,10 +324,10 @@ class CacheFactoryProvider {
                 if (itemJson) {
                   item = angular.fromJson(itemJson);
                   return {
-                    created: item.created,
-                    accessed: item.accessed,
-                    expires: item.expires,
-                    isExpired: (new Date().getTime() - item.created) > this.$$maxAge
+                    created: item.created, // 创建时间
+                    accessed: item.accessed, // 最后一次访问时间
+                    expires: item.expires, // 过期时间
+                    isExpired: (new Date().getTime() - item.created) > this.$$maxAge // 是否已经过期
                   };
                 } else {
                   return undefined;
@@ -431,11 +433,11 @@ class CacheFactoryProvider {
             let item = {
               key: key,
               value: _isPromiseLike(value) ? value.then(getHandler(storeOnResolve, false), getHandler(storeOnReject, true)) : value,
-              created: now,
-              accessed: now
+              created: now, // 创建时间
+              accessed: now // 最后访问时间
             };
 
-            item.expires = item.created + this.$$maxAge;
+            item.expires = item.created + this.$$maxAge; // 过期时间 = 创建时间 + maxAge
 
             if ($$storage) {
               if (_isPromiseLike(item.value)) {
@@ -450,11 +452,13 @@ class CacheFactoryProvider {
               if (itemJson) {
                 this.remove(key);
               }
+              // item过期时间列表
               // Add to expires heap
               $$expiresHeap.push({
                 key: key,
                 expires: item.expires
               });
+              // item最后访问时间列表
               // Add to lru heap
               $$lruHeap.push({
                 key: key,
@@ -563,6 +567,7 @@ class CacheFactoryProvider {
             let key;
             let expiredItem;
 
+            // 遍历，检查是否过期
             while ((expiredItem = $$expiresHeap.peek()) && expiredItem.expires <= now) {
               expired[expiredItem.key] = expiredItem.value ? expiredItem.value : null;
               $$expiresHeap.pop();
@@ -794,6 +799,7 @@ class CacheFactoryProvider {
               this.$$recycleFreq = recycleFreq;
             }
             clearInterval(this.$$recycleFreqId);
+            // 配合aggressive
             if (this.$$deleteOnExpire === 'aggressive') {
               (function (self) {
                 self.$$recycleFreqId = setInterval(function () {
